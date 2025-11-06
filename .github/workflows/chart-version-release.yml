@@ -114,14 +114,11 @@ jobs:
           NEW_VERSION="${{ steps.bump.outputs.new_version }}"
 
           git add charts/lfx-v2-ui/Chart.yaml
-          git commit -S -m "chore(helm): bump chart version to $NEW_VERSION [skip-version-bump]
+          git commit -S -m "chore(helm): bump chart version to $NEW_VERSION [skip-version-bump]" \
+              -m "Automated patch version bump for Helm chart." \
+              -m "LFXV2-696"
 
-Automated patch version bump for Helm chart.
-
-LFXV2-696"
-
-
-          # Push commit 
+          # Push commit
           git push origin main
 
           # Create and push tag
@@ -136,9 +133,9 @@ LFXV2-696"
         id: tag-check
         run: |
           set -euo pipefail
-          TAG_NAME="${{ steps.chart-version.outputs.tag_name }}"
+          TAG_NAME="$(yq '.version' "$CHART_FILE")"
 
-          if git ls-remote --tags origin | grep -q "refs/tags/$TAG_NAME$"; then
+          if git ls-remote --tags origin | grep -q "refs/tags/v$TAG_NAME$"; then
             echo "Tag $TAG_NAME already exists"
             echo "tag_exists=true" >> "$GITHUB_OUTPUT"
           else
