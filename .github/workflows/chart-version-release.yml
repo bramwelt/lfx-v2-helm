@@ -1,0 +1,166 @@
+# Copyright The Linux Foundation and each contributor to LFX.
+# SPDX-License-Identifier: MIT
+---
+name: Chart Version Release
+
+"on":
+  push:
+    branches:
+      - main
+    paths:
+      - 'charts/*/Chart.yaml'
+
+permissions:
+  contents: write
+  pull-requests: write
+
+
+# On merges with changes to the Chart.yaml
+#   Create a commit to bump the version in Chart.yaml, git push the
+#   change (skipped if manually modified)
+# Create a Github release (creates a tag)
+#  - Creates and publishes a helm chart to the helm repo
+## Bump Chart Version patch and Create a tagged Github Release
+#   If the
+jobs:
+  check-chart-version:
+    name: Check Chart Version and Create Release
+    runs-on: ubuntu-latest
+    # Because this workflow both modifies and is triggered off of
+    # changes to Chart.yaml, a commit message tag '[skip-version-bump]'
+    # is used to prevent loops
+    if: "!contains(github.event.head_commit.message, '[skip-version-bump]')"
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8  # v4
+        with:
+          fetch-depth: 2
+          fetch-tags: true
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      # TODO Make this an LFX Bot?
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Install yq
+        run: |
+          sudo wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
+          sudo chmod +x /usr/local/bin/yq
+
+      - name: Check if Chart.yaml version was manually modified
+        id: check-version-change
+        run: |
+          set -euo pipefail
+
+          # Get the list of modified files in this push
+          CHANGED_FILES=$(git diff --name-only HEAD^ HEAD)
+
+          # Check if Chart.yaml was modified
+          if echo "$CHANGED_FILES" | grep -q "charts/.*/Chart.yaml"; then
+            echo "Chart.yaml was modified in this push"
+
+            # Check if the version field specifically was changed
+            VERSION_DIFF=$(git diff HEAD^ HEAD -- charts/*/Chart.yaml | grep "^[+-]version:" || true)
+
+            if [ -n "$VERSION_DIFF" ]; then
+              echo "Version was manually modified in Chart.yaml"
+              echo "manual_change=true" >> "$GITHUB_OUTPUT"
+              echo "version_changed=true" >> "$GITHUB_OUTPUT"
+            else
+              echo "Chart.yaml changed but version was not modified"
+              echo "manual_change=false" >> "$GITHUB_OUTPUT"
+              echo "version_changed=false" >> "$GITHUB_OUTPUT"
+            fi
+          else
+            echo "Chart.yaml was not modified, proceeding with auto-bump"
+            echo "manual_change=false" >> "$GITHUB_OUTPUT"
+            echo "version_changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Bump patch version
+        if: steps.check-version-change.outputs.manual_change == 'false'
+        id: bump
+        run: |
+          set -euo pipefail
+
+          CHART_FILE="charts/lfx-v2-ui/Chart.yaml"
+
+          # Get current version
+          CURRENT_VERSION=$(yq '.version' "$CHART_FILE")
+          echo "Current version: $CURRENT_VERSION"
+
+          # Parse version components
+          IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT_VERSION"
+
+          # Bump patch version
+          NEW_PATCH=$((PATCH + 1))
+          NEW_VERSION="${MAJOR}.${MINOR}.${NEW_PATCH}"
+          echo "New version: $NEW_VERSION"
+
+          # Update Chart.yaml
+          yq -i ".version = \"$NEW_VERSION\"" "$CHART_FILE"
+
+          # Output for next steps
+          echo "new_version=$NEW_VERSION" >> "$GITHUB_OUTPUT"
+          echo "current_version=$CURRENT_VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Commit version bump
+        if: steps.check-version-change.outputs.manual_change == 'false'
+        run: |
+          set -euo pipefail
+
+          NEW_VERSION="${{ steps.bump.outputs.new_version }}"
+
+          git add charts/lfx-v2-ui/Chart.yaml
+          git commit -S -m "chore(helm): bump chart version to $NEW_VERSION [skip-version-bump]
+
+Automated patch version bump for Helm chart.
+
+LFXV2-696"
+
+
+          # Push commit 
+          git push origin main
+
+          # Create and push tag
+          # TODO Release will create tag
+          #git tag -a "v$NEW_VERSION" -m "Release v$NEW_VERSION"
+
+          # TODO Release will create tag
+          # git push origin "v$NEW_VERSION"
+
+      - name: Check if tag exists
+        if: steps.check-version-change.outputs.version_changed == 'true'
+        id: tag-check
+        run: |
+          set -euo pipefail
+          TAG_NAME="${{ steps.chart-version.outputs.tag_name }}"
+
+          if git ls-remote --tags origin | grep -q "refs/tags/$TAG_NAME$"; then
+            echo "Tag $TAG_NAME already exists"
+            echo "tag_exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "Tag $TAG_NAME does not exist"
+            echo "tag_exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      # TODO Should create the release regardless if the version changed
+      # in this workflow
+      - name: Create release
+        if: steps.check-version-change.outputs.version_changed == 'true'
+          && steps.tag-check.outputs.tag_exists == 'false'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          # Take the tag from the Chart.yaml, as the other steps may not
+          # have run if the chart was manually modified
+          TAG_NAME="$(yq '.version' "$CHART_FILE")"
+
+          # Create GitHub release
+          gh release create "v$TAG_NAME" \
+            --title "v$TAG_NAME" \
+            --generate-notes
