@@ -114,14 +114,12 @@ jobs:
           NEW_VERSION="${{ steps.bump.outputs.new_version }}"
 
           git add charts/lfx-v2-ui/Chart.yaml
-          git commit -S -m "chore(helm): bump chart version to $NEW_VERSION [skip-version-bump]
 
-Automated patch version bump for Helm chart.
+          git commit --signoff -m "chore(helm): bump chart version to $NEW_VERSION [skip-version-bump]" \
+            -m "Automated patch version bump for Helm chart." \
+            -m "LFXV2-696"
 
-LFXV2-696"
-
-
-          # Push commit 
+          # Push commit
           git push origin main
 
           # Create and push tag
