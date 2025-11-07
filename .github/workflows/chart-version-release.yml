@@ -77,13 +77,14 @@ jobs:
             echo "version_changed=true" >> "$GITHUB_OUTPUT"
           fi
 
+      # TODO Make repo name configurable or dynamic
       - name: Bump patch version
         if: steps.check-version-change.outputs.manual_change == 'false'
         id: bump
         run: |
           set -euo pipefail
 
-          CHART_FILE="charts/lfx-v2-ui/Chart.yaml"
+          CHART_FILE="charts/lfx-v2-helm/Chart.yaml"
 
           # Get current version
           CURRENT_VERSION=$(yq '.version' "$CHART_FILE")
