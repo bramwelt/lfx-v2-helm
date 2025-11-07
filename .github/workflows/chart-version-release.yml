@@ -7,8 +7,8 @@ name: Chart Version Release
   push:
     branches:
       - main
-    paths:
-      - 'charts/**'
+        #     paths:
+        #       - 'charts/**'
 
 permissions:
   contents: write
@@ -37,12 +37,6 @@ jobs:
           fetch-depth: 2
           fetch-tags: true
           token: ${{ secrets.GITHUB_TOKEN }}
-
-      # TODO Make this an LFX Bot?
-      - name: Configure Git
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
 
       - name: Install yq
         run: |
@@ -106,6 +100,15 @@ jobs:
           # Output for next steps
           echo "new_version=$NEW_VERSION" >> "$GITHUB_OUTPUT"
           echo "current_version=$CURRENT_VERSION" >> "$GITHUB_OUTPUT"
+
+      # TODO Make this an LFX Bot?
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      # Try using chainguard action to sign commits
+      - uses: chainguard-dev/actions/setup-gitsign@main
 
       # TODO Make repo name configurable or dynamic
       - name: Commit version bump
