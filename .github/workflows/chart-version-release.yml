@@ -121,7 +121,7 @@ jobs:
 
           git add charts/lfx-platform/Chart.yaml
 
-          git commit --signoff -m "chore(helm): bump chart version to $NEW_VERSION [skip-version-bump]" \
+          git commit --gpg-sign --signoff -m "chore(helm): bump chart version to $NEW_VERSION [skip-version-bump]" \
             -m "Automated patch version bump for Helm chart." \
             -m "LFXV2-696"
 
