@@ -84,7 +84,7 @@ jobs:
         run: |
           set -euo pipefail
 
-          CHART_FILE="charts/lfx-v2-helm/Chart.yaml"
+          CHART_FILE="charts/lfx-platform/Chart.yaml"
 
           # Get current version
           CURRENT_VERSION=$(yq '.version' "$CHART_FILE")
@@ -113,7 +113,7 @@ jobs:
 
           NEW_VERSION="${{ steps.bump.outputs.new_version }}"
 
-          git add charts/lfx-v2-helm/Chart.yaml
+          git add charts/lfx-platform/Chart.yaml
 
           git commit --signoff -m "chore(helm): bump chart version to $NEW_VERSION [skip-version-bump]" \
             -m "Automated patch version bump for Helm chart." \
