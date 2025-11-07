@@ -104,6 +104,7 @@ jobs:
           echo "new_version=$NEW_VERSION" >> "$GITHUB_OUTPUT"
           echo "current_version=$CURRENT_VERSION" >> "$GITHUB_OUTPUT"
 
+      # TODO Make repo name configurable or dynamic
       - name: Commit version bump
         if: steps.check-version-change.outputs.manual_change == 'false'
         run: |
@@ -111,7 +112,7 @@ jobs:
 
           NEW_VERSION="${{ steps.bump.outputs.new_version }}"
 
-          git add charts/lfx-v2-ui/Chart.yaml
+          git add charts/lfx-v2-helm/Chart.yaml
 
           git commit --signoff -m "chore(helm): bump chart version to $NEW_VERSION [skip-version-bump]" \
             -m "Automated patch version bump for Helm chart." \
