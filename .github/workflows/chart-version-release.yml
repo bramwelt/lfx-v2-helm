@@ -5,10 +5,8 @@ name: Chart Version Release
 
 "on":
   pull_request:
-    branches:
-      - main
     paths:
-      - 'charts/*/Chart.yaml'
+      - 'charts/**'
 
 permissions:
   contents: write
