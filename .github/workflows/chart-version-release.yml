@@ -134,9 +134,9 @@ jobs:
         id: tag-check
         run: |
           set -euo pipefail
-          TAG_NAME="${{ steps.chart-version.outputs.tag_name }}"
+          TAG_NAME="$(yq '.version' "$CHART_FILE")"
 
-          if git ls-remote --tags origin | grep -q "refs/tags/$TAG_NAME$"; then
+          if git ls-remote --tags origin | grep -q "refs/tags/v$TAG_NAME$"; then
             echo "Tag $TAG_NAME already exists"
             echo "tag_exists=true" >> "$GITHUB_OUTPUT"
           else
