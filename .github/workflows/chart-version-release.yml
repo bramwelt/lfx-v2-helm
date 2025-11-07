@@ -13,6 +13,7 @@ name: Chart Version Release
 permissions:
   contents: write
   pull-requests: write
+  id-token: write
 
 
 # On merges with changes to the Chart.yaml
