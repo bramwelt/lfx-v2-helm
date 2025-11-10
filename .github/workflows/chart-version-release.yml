@@ -9,8 +9,8 @@ name: Chart Version Release
   push:
     branches:
       - main
-        #     paths:
-        #       - 'charts/**'
+      #     paths:
+      #       - 'charts/**'
 
 permissions:
   contents: write
