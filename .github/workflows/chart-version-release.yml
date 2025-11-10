@@ -14,26 +14,17 @@ name: Chart Version Release
 
 permissions:
   contents: write
-  pull-requests: write
   id-token: write
 
-# On merges with changes to the Chart
-#   Create a commit to bump the version in Chart.yaml and push the
-#   change (skipped if manually modified)
-# Create a Github release (creates a tag)
-#  - Creates and publishes a helm chart to the helm repo
-## Bump Chart Version patch and Create a tagged Github Release
-#   If the
+# On merges to the default branch with Chart.yaml version changes:
+#   Create a GitHub release (creates a tag)
+#   - Creates and publishes a helm chart to the helm repo
 jobs:
-  check-chart-version:
+  create-release:
     env:
       CHART_FILE: charts/lfx-platform/Chart.yaml
-    name: Check Chart Version and Create Release
+    name: Create GitHub Release
     runs-on: ubuntu-latest
-    # Because this workflow both modifies and is triggered off of
-    # changes to Chart.yaml, a commit message tag '[skip-version-bump]'
-    # is used to prevent loops
-    if: "!contains(github.event.head_commit.message, '[skip-version-bump]')"
     steps:
       - name: Checkout repository
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8  # v4
@@ -47,7 +38,7 @@ jobs:
           sudo wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
           sudo chmod +x /usr/local/bin/yq
 
-      - name: Check if Chart.yaml version was manually modified
+      - name: Check if Chart.yaml version was modified
         id: check-version-change
         run: |
           set -euo pipefail
@@ -63,66 +54,16 @@ jobs:
             VERSION_DIFF=$(git diff HEAD^ HEAD -- charts/*/Chart.yaml | grep "^[+-]version:" || true)
 
             if [ -n "$VERSION_DIFF" ]; then
-              echo "Version was manually modified in Chart.yaml"
-              echo "manual_change=true" >> "$GITHUB_OUTPUT"
+              echo "Version was modified in Chart.yaml"
               echo "version_changed=true" >> "$GITHUB_OUTPUT"
             else
               echo "Chart.yaml changed but version was not modified"
-              echo "manual_change=false" >> "$GITHUB_OUTPUT"
               echo "version_changed=false" >> "$GITHUB_OUTPUT"
             fi
           else
-            echo "Chart.yaml was not modified, proceeding with auto-bump"
-            echo "manual_change=false" >> "$GITHUB_OUTPUT"
-            echo "version_changed=true" >> "$GITHUB_OUTPUT"
+            echo "Chart.yaml was not modified, skipping release"
+            echo "version_changed=false" >> "$GITHUB_OUTPUT"
           fi
-
-      # TODO Make repo name configurable or dynamic
-      - name: Bump patch version
-        if: steps.check-version-change.outputs.manual_change == 'false'
-        id: bump
-        run: |
-          set -euo pipefail
-
-          # Get current version
-          CURRENT_VERSION=$(yq '.version' "$CHART_FILE")
-          echo "Current version: $CURRENT_VERSION"
-
-          # Parse version components
-          IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT_VERSION"
-
-          # Bump patch version
-          NEW_PATCH=$((PATCH + 1))
-          NEW_VERSION="${MAJOR}.${MINOR}.${NEW_PATCH}"
-          echo "New version: $NEW_VERSION"
-
-          # Update Chart.yaml
-          yq -i ".version = \"$NEW_VERSION\"" "$CHART_FILE"
-
-          # Output for next steps
-          echo "new_version=$NEW_VERSION" >> "$GITHUB_OUTPUT"
-          echo "current_version=$CURRENT_VERSION" >> "$GITHUB_OUTPUT"
-
-      # Try using chainguard action to sign commits
-      - uses: chainguard-dev/actions/setup-gitsign@main
-
-      # TODO Make repo name configurable or dynamic
-      - name: Commit version bump
-        if: steps.check-version-change.outputs.manual_change == 'false'
-        run: |
-          set -euo pipefail
-
-          NEW_VERSION="${{ steps.bump.outputs.new_version }}"
-
-          git add $CHART_FILE
-
-          git commit --gpg-sign --signoff -m "chore(helm): bump chart version to $NEW_VERSION [skip-version-bump]" \
-            -m "Automated patch version bump for Helm chart." \
-            -m "LFXV2-696"
-
-          # Commit must be signed, and workflow needs to be allowed to
-          # bypass required PR
-          git push origin main
 
       - name: Create release
         if: steps.check-version-change.outputs.version_changed == 'true'

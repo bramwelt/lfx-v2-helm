@@ -3,7 +3,7 @@
 ---
 # Automatically create a new pull-request to bump the Chart.yaml version on
 # merges to the default branch
-name: Chart Version Release
+name: Chart Version Bump
 
 "on":
   push:
@@ -17,18 +17,14 @@ permissions:
   pull-requests: write
   id-token: write
 
-# On merges with changes to the Chart
-#   Create a commit to bump the version in Chart.yaml and push the
-#   change (skipped if manually modified)
-# Create a Github release (creates a tag)
-#  - Creates and publishes a helm chart to the helm repo
-## Bump Chart Version patch and Create a tagged Github Release
-#   If the
+# On merges to the default branch:
+#   Create a commit to bump the version in Chart.yaml and create a PR
+#   (skipped if Chart.yaml version was manually modified)
 jobs:
   check-chart-version:
     env:
       CHART_FILE: charts/lfx-platform/Chart.yaml
-    name: Check Chart Version and Create Release
+    name: Check Chart Version and Create PR
     runs-on: ubuntu-latest
     # Because this workflow both modifies and is triggered off of
     # changes to Chart.yaml, a commit message tag '[skip-version-bump]'
@@ -103,39 +99,34 @@ jobs:
           echo "new_version=$NEW_VERSION" >> "$GITHUB_OUTPUT"
           echo "current_version=$CURRENT_VERSION" >> "$GITHUB_OUTPUT"
 
-      # Try using chainguard action to sign commits
-      - uses: chainguard-dev/actions/setup-gitsign@main
-
-      # TODO Make repo name configurable or dynamic
-      - name: Commit version bump
+      - name: Create Pull Request
         if: steps.check-version-change.outputs.manual_change == 'false'
-        run: |
-          set -euo pipefail
+        id: cpr
+        uses: peter-evans/create-pull-request@v7
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          body: |
+            Automated patch version bump for Helm chart.
 
-          NEW_VERSION="${{ steps.bump.outputs.new_version }}"
+            - Current version: ${{ steps.bump.outputs.current_version }}
+            - New version: ${{ steps.bump.outputs.new_version }}
+          commit-message: |
+            chore(helm): bump chart version to ${{ steps.bump.outputs.new_version }} [skip-version-bump]
 
-          git add $CHART_FILE
+            Automated patch version bump for Helm chart.
+          branch: chart-version-bump-${{ steps.bump.outputs.new_version }}
+          draft: false
+          signoff: true
+          sign-commits: true
+          title: "chore(helm): bump chart version to ${{ steps.bump.outputs.new_version }}"
+          labels: |
+            automated
 
-          git commit --gpg-sign --signoff -m "chore(helm): bump chart version to $NEW_VERSION [skip-version-bump]" \
-            -m "Automated patch version bump for Helm chart." \
-            -m "LFXV2-696"
-
-          # Commit must be signed, and workflow needs to be allowed to
-          # bypass required PR
-          git push origin main
-
-      - name: Create release
-        if: steps.check-version-change.outputs.version_changed == 'true'
+      - name: Auto Approve & Enable Auto Merge
+        if: steps.cpr.outputs.pull-request-operation == 'created'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          set -euo pipefail
-
-          # Take the tag from the Chart.yaml, as the other steps may not
-          # have run if the chart was manually modified
-          TAG_NAME="$(yq '.version' "$CHART_FILE")"
-
-          # Create GitHub release
-          gh release create "v$TAG_NAME" \
-            --title "v$TAG_NAME" \
-            --generate-notes
+          gh pr review --approve "${{ steps.cpr.outputs.pull-request-number }}"
+          gh pr merge --auto "${{ steps.cpr.outputs.pull-request-number }}"
