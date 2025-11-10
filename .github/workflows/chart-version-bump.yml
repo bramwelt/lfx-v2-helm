@@ -128,5 +128,6 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh pr review --approve "${{ steps.cpr.outputs.pull-request-number }}"
+          # Skip auto approvals
+          # gh pr review --approve "${{ steps.cpr.outputs.pull-request-number }}"
           gh pr merge --auto "${{ steps.cpr.outputs.pull-request-number }}"
