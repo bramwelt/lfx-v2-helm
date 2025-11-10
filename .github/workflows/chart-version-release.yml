@@ -1,6 +1,8 @@
 # Copyright The Linux Foundation and each contributor to LFX.
 # SPDX-License-Identifier: MIT
 ---
+# Automatically create a new Github Release on changes that modify the
+# Chart.yaml version when merged to the default branch
 name: Chart Version Release
 
 "on":
@@ -121,21 +123,6 @@ jobs:
           # Commit must be signed, and workflow needs to be allowed to
           # bypass required PR
           git push origin main
-
-      - name: Check if tag exists
-        if: steps.check-version-change.outputs.version_changed == 'true'
-        id: tag-check
-        run: |
-          set -euo pipefail
-          TAG_NAME="$(yq '.version' "$CHART_FILE")"
-
-          if git ls-remote --tags origin | grep -q "refs/tags/v$TAG_NAME$"; then
-            echo "Tag $TAG_NAME already exists"
-            echo "tag_exists=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "Tag $TAG_NAME does not exist"
-            echo "tag_exists=false" >> "$GITHUB_OUTPUT"
-          fi
 
       - name: Create release
         if: steps.check-version-change.outputs.version_changed == 'true'
