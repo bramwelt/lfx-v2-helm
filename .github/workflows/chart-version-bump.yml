@@ -1,0 +1,141 @@
+# Copyright The Linux Foundation and each contributor to LFX.
+# SPDX-License-Identifier: MIT
+---
+# Automatically create a new pull-request to bump the Chart.yaml version on
+# merges to the default branch
+name: Chart Version Release
+
+"on":
+  push:
+    branches:
+      - main
+        #     paths:
+        #       - 'charts/**'
+
+permissions:
+  contents: write
+  pull-requests: write
+  id-token: write
+
+# On merges with changes to the Chart
+#   Create a commit to bump the version in Chart.yaml and push the
+#   change (skipped if manually modified)
+# Create a Github release (creates a tag)
+#  - Creates and publishes a helm chart to the helm repo
+## Bump Chart Version patch and Create a tagged Github Release
+#   If the
+jobs:
+  check-chart-version:
+    env:
+      CHART_FILE: charts/lfx-platform/Chart.yaml
+    name: Check Chart Version and Create Release
+    runs-on: ubuntu-latest
+    # Because this workflow both modifies and is triggered off of
+    # changes to Chart.yaml, a commit message tag '[skip-version-bump]'
+    # is used to prevent loops
+    if: "!contains(github.event.head_commit.message, '[skip-version-bump]')"
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8  # v4
+        with:
+          fetch-depth: 2
+          fetch-tags: true
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Install yq
+        run: |
+          sudo wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
+          sudo chmod +x /usr/local/bin/yq
+
+      - name: Check if Chart.yaml version was manually modified
+        id: check-version-change
+        run: |
+          set -euo pipefail
+
+          # Get the list of modified files in this push
+          CHANGED_FILES=$(git diff --name-only HEAD^ HEAD)
+
+          # Check if Chart.yaml was modified
+          if echo "$CHANGED_FILES" | grep -q "charts/.*/Chart.yaml"; then
+            echo "Chart.yaml was modified in this push"
+
+            # Check if the version field specifically was changed
+            VERSION_DIFF=$(git diff HEAD^ HEAD -- charts/*/Chart.yaml | grep "^[+-]version:" || true)
+
+            if [ -n "$VERSION_DIFF" ]; then
+              echo "Version was manually modified in Chart.yaml"
+              echo "manual_change=true" >> "$GITHUB_OUTPUT"
+              echo "version_changed=true" >> "$GITHUB_OUTPUT"
+            else
+              echo "Chart.yaml changed but version was not modified"
+              echo "manual_change=false" >> "$GITHUB_OUTPUT"
+              echo "version_changed=false" >> "$GITHUB_OUTPUT"
+            fi
+          else
+            echo "Chart.yaml was not modified, proceeding with auto-bump"
+            echo "manual_change=false" >> "$GITHUB_OUTPUT"
+            echo "version_changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      # TODO Make repo name configurable or dynamic
+      - name: Bump patch version
+        if: steps.check-version-change.outputs.manual_change == 'false'
+        id: bump
+        run: |
+          set -euo pipefail
+
+          # Get current version
+          CURRENT_VERSION=$(yq '.version' "$CHART_FILE")
+          echo "Current version: $CURRENT_VERSION"
+
+          # Parse version components
+          IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT_VERSION"
+
+          # Bump patch version
+          NEW_PATCH=$((PATCH + 1))
+          NEW_VERSION="${MAJOR}.${MINOR}.${NEW_PATCH}"
+          echo "New version: $NEW_VERSION"
+
+          # Update Chart.yaml
+          yq -i ".version = \"$NEW_VERSION\"" "$CHART_FILE"
+
+          # Output for next steps
+          echo "new_version=$NEW_VERSION" >> "$GITHUB_OUTPUT"
+          echo "current_version=$CURRENT_VERSION" >> "$GITHUB_OUTPUT"
+
+      # Try using chainguard action to sign commits
+      - uses: chainguard-dev/actions/setup-gitsign@main
+
+      # TODO Make repo name configurable or dynamic
+      - name: Commit version bump
+        if: steps.check-version-change.outputs.manual_change == 'false'
+        run: |
+          set -euo pipefail
+
+          NEW_VERSION="${{ steps.bump.outputs.new_version }}"
+
+          git add $CHART_FILE
+
+          git commit --gpg-sign --signoff -m "chore(helm): bump chart version to $NEW_VERSION [skip-version-bump]" \
+            -m "Automated patch version bump for Helm chart." \
+            -m "LFXV2-696"
+
+          # Commit must be signed, and workflow needs to be allowed to
+          # bypass required PR
+          git push origin main
+
+      - name: Create release
+        if: steps.check-version-change.outputs.version_changed == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          # Take the tag from the Chart.yaml, as the other steps may not
+          # have run if the chart was manually modified
+          TAG_NAME="$(yq '.version' "$CHART_FILE")"
+
+          # Create GitHub release
+          gh release create "v$TAG_NAME" \
+            --title "v$TAG_NAME" \
+            --generate-notes
