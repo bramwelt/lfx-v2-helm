@@ -36,35 +36,26 @@ jobs:
           sudo wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
           sudo chmod +x /usr/local/bin/yq
 
-      - name: Check if Chart.yaml version was modified
-        id: check-version-change
+      - name: Check if release tag already exists
+        id: check-tag-exists
         run: |
           set -euo pipefail
 
-          # Get the list of modified files in this push
-          CHANGED_FILES=$(git diff --name-only HEAD^ HEAD)
+          # Get the version from Chart.yaml
+          TAG_NAME="v$(yq '.version' charts/*/Chart.yaml)"
+          echo "Checking if tag $TAG_NAME already exists..."
 
-          # Check if Chart.yaml was modified
-          if echo "$CHANGED_FILES" | grep -q "charts/.*/Chart.yaml"; then
-            echo "Chart.yaml was modified in this push"
-
-            # Check if the version field specifically was changed
-            VERSION_DIFF=$(git diff HEAD^ HEAD -- charts/*/Chart.yaml | grep "^[+-]version:" || true)
-
-            if [ -n "$VERSION_DIFF" ]; then
-              echo "Version was modified in Chart.yaml"
-              echo "version_changed=true" >> "$GITHUB_OUTPUT"
-            else
-              echo "Chart.yaml changed but version was not modified"
-              echo "version_changed=false" >> "$GITHUB_OUTPUT"
-            fi
+          # Check if the tag exists in the repository
+          if git tag -l "$TAG_NAME" | grep -q "$TAG_NAME"; then
+            echo "Tag $TAG_NAME already exists, skipping release"
+            echo "should_release=false" >> "$GITHUB_OUTPUT"
           else
-            echo "Chart.yaml was not modified, skipping release"
-            echo "version_changed=false" >> "$GITHUB_OUTPUT"
+            echo "Tag $TAG_NAME does not exist, proceeding with release"
+            echo "should_release=true" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Create release
-        if: steps.check-version-change.outputs.version_changed == 'true'
+        if: steps.check-tag-exists.outputs.should_release == 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
