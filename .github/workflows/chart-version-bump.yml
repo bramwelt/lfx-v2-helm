@@ -17,6 +17,9 @@ permissions:
   pull-requests: write
   id-token: write
 
+secrets:
+  PAT:
+
 # On merges to the default branch:
 #   Create a commit to bump the version in Chart.yaml and create a PR
 #   (skipped if Chart.yaml version was manually modified)
@@ -112,7 +115,7 @@ jobs:
         id: cpr
         uses: peter-evans/create-pull-request@v7
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.PAT }}
         with:
           body: |
             Automated patch version bump for Helm chart.
@@ -134,6 +137,6 @@ jobs:
       - name: Enable Auto Merge
         if: steps.cpr.outputs.pull-request-operation == 'created'
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.PAT }}
         run: |
           gh pr merge --merge --auto "${{ steps.cpr.outputs.pull-request-number }}"
