@@ -1,10 +1,6 @@
 # Copyright The Linux Foundation and each contributor to LFX.
 # SPDX-License-Identifier: MIT
 ---
-test: test2
-test2: test3
-test3: test4
-
 # LFX global values
 lfx:
   # Domain configuration
