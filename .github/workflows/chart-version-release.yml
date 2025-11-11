@@ -11,7 +11,7 @@ name: Chart Version Release
     branches:
       - main
     paths:
-      - 'charts/**'
+      - 'charts/*/Chart.yaml'
 
 permissions:
   contents: write
