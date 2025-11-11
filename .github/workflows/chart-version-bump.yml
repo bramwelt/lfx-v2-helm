@@ -130,4 +130,4 @@ jobs:
         run: |
           # Skip auto approvals
           # gh pr review --approve "${{ steps.cpr.outputs.pull-request-number }}"
-          gh pr merge --auto "${{ steps.cpr.outputs.pull-request-number }}"
+          gh pr merge --merge --auto "${{ steps.cpr.outputs.pull-request-number }}"
