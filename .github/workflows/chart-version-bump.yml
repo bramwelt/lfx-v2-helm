@@ -17,9 +17,6 @@ permissions:
   pull-requests: write
   id-token: write
 
-secrets:
-  PAT:
-
 # On merges to the default branch:
 #   Create a commit to bump the version in Chart.yaml and create a PR
 #   (skipped if Chart.yaml version was manually modified)
