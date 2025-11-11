@@ -21,8 +21,6 @@ permissions:
 #   - Creates and publishes a helm chart to the helm repo
 jobs:
   create-release:
-    env:
-      CHART_FILE: charts/lfx-platform/Chart.yaml
     name: Create GitHub Release
     runs-on: ubuntu-latest
     steps:
@@ -71,6 +69,10 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
+
+          CHART_NAME="$(yq '.name' charts/*/Chart.yaml)"
+          CHART_VERSION="$(yq '.version' charts/*/Chart.yaml)"
+          CHART_FILE="charts/$CHART_NAME/Chart.yaml"
 
           # Take the tag from the Chart.yaml, as the other steps may not
           # have run if the chart was manually modified

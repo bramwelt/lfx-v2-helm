@@ -22,8 +22,6 @@ permissions:
 #   (skipped if Chart.yaml version was manually modified)
 jobs:
   check-chart-version:
-    env:
-      CHART_FILE: charts/lfx-platform/Chart.yaml
     name: Check Chart Version and Create PR
     runs-on: ubuntu-latest
     # Because this workflow both modifies and is triggered off of
@@ -43,6 +41,18 @@ jobs:
           sudo wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
           sudo chmod +x /usr/local/bin/yq
 
+      - name: Prepare versions and chart name
+        id: prepare
+        run: |
+          set -euo pipefail
+          CHART_NAME="$(yq '.name' charts/*/Chart.yaml)"
+          CHART_FILE="charts/$CHART_NAME/Chart.yaml"
+          CHART_VERSION="$(yq '.version' charts/*/Chart.yaml)"
+          {
+            echo "chart_file=$CHART_NAME"
+            echo "chart_version=$CHART_VERSION"
+          } >> "$GITHUB_OUTPUT"
+
       - name: Check if Chart.yaml version was manually modified
         id: check-version-change
         run: |
@@ -60,28 +70,26 @@ jobs:
 
             if [ -n "$VERSION_DIFF" ]; then
               echo "Version was manually modified in Chart.yaml"
-              echo "manual_change=true" >> "$GITHUB_OUTPUT"
               echo "version_changed=true" >> "$GITHUB_OUTPUT"
             else
               echo "Chart.yaml changed but version was not modified"
-              echo "manual_change=false" >> "$GITHUB_OUTPUT"
               echo "version_changed=false" >> "$GITHUB_OUTPUT"
             fi
           else
             echo "Chart.yaml was not modified, proceeding with auto-bump"
-            echo "manual_change=false" >> "$GITHUB_OUTPUT"
-            echo "version_changed=true" >> "$GITHUB_OUTPUT"
+            echo "version_changed=false" >> "$GITHUB_OUTPUT"
           fi
 
-      # TODO Make repo name configurable or dynamic
       - name: Bump patch version
-        if: steps.check-version-change.outputs.manual_change == 'false'
+        if: steps.check-version-change.outputs.version_changed == 'false'
         id: bump
         run: |
           set -euo pipefail
 
+          CHART_FILE="${{ steps.detect-chart.outputs.chart_file }}"
+
           # Get current version
-          CURRENT_VERSION=$(yq '.version' "$CHART_FILE")
+          CURRENT_VERSION="${{ steps.prepare.outputs.chart_version }}"
           echo "Current version: $CURRENT_VERSION"
 
           # Parse version components
@@ -100,7 +108,7 @@ jobs:
           echo "current_version=$CURRENT_VERSION" >> "$GITHUB_OUTPUT"
 
       - name: Create Pull Request
-        if: steps.check-version-change.outputs.manual_change == 'false'
+        if: steps.check-version-change.outputs.version_changed == 'false'
         id: cpr
         uses: peter-evans/create-pull-request@v7
         env:
@@ -123,11 +131,9 @@ jobs:
           labels: |
             automated
 
-      - name: Auto Approve & Enable Auto Merge
+      - name: Enable Auto Merge
         if: steps.cpr.outputs.pull-request-operation == 'created'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # Skip auto approvals
-          # gh pr review --approve "${{ steps.cpr.outputs.pull-request-number }}"
           gh pr merge --merge --auto "${{ steps.cpr.outputs.pull-request-number }}"
