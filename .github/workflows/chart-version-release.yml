@@ -70,13 +70,7 @@ jobs:
         run: |
           set -euo pipefail
 
-          CHART_NAME="$(yq '.name' charts/*/Chart.yaml)"
-          CHART_VERSION="$(yq '.version' charts/*/Chart.yaml)"
-          CHART_FILE="charts/$CHART_NAME/Chart.yaml"
-
-          # Take the tag from the Chart.yaml, as the other steps may not
-          # have run if the chart was manually modified
-          TAG_NAME="$(yq '.version' "$CHART_FILE")"
+          TAG_NAME="$(yq '.version' charts/*/Chart.yaml)"
 
           # Create GitHub release
           gh release create "v$TAG_NAME" \
