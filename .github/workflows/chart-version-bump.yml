@@ -86,7 +86,7 @@ jobs:
         run: |
           set -euo pipefail
 
-          CHART_FILE="${{ steps.detect-chart.outputs.chart_file }}"
+          CHART_FILE="${{ steps.prepare.outputs.chart_file }}"
 
           # Get current version
           CURRENT_VERSION="${{ steps.prepare.outputs.chart_version }}"
