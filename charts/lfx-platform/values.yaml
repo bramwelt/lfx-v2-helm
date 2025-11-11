@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: MIT
 ---
 test: test2
+test2: test3
 
 # LFX global values
 lfx:
