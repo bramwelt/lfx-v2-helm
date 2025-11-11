@@ -6,6 +6,7 @@
 name: Chart Version Release
 
 "on":
+  workflow_dispatch: null
   push:
     branches:
       - main
