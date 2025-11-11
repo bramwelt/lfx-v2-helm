@@ -49,7 +49,7 @@ jobs:
           CHART_FILE="charts/$CHART_NAME/Chart.yaml"
           CHART_VERSION="$(yq '.version' charts/*/Chart.yaml)"
           {
-            echo "chart_file=$CHART_NAME"
+            echo "chart_file=$CHART_FILE"
             echo "chart_version=$CHART_VERSION"
           } >> "$GITHUB_OUTPUT"
 
