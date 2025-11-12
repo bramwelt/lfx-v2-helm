@@ -10,7 +10,11 @@ name: Chart Version Bump
     branches:
       - main
     paths:
+      # Run on all changes to the chart
       - 'charts/**'
+      # Don't run if only the Chart.yaml file is modified - this assumes
+      # the change includes a version bump
+      - '!charts/*/Chart.yaml'
 
 permissions:
   contents: write
@@ -53,35 +57,35 @@ jobs:
             echo "chart_version=$CHART_VERSION"
           } >> "$GITHUB_OUTPUT"
 
-      - name: Check if Chart.yaml version was manually modified
-        id: check-version-change
-        run: |
-          set -euo pipefail
+          # - name: Check if Chart.yaml version was manually modified
+          #   id: check-version-change
+          #   run: |
+          #     set -euo pipefail
 
-          # Get the list of modified files in this push
-          CHANGED_FILES=$(git diff --name-only HEAD^ HEAD)
+          #     # Get the list of modified files in this push
+          #     CHANGED_FILES=$(git diff --name-only HEAD^ HEAD)
 
-          # Check if Chart.yaml was modified
-          if echo "$CHANGED_FILES" | grep -q "charts/.*/Chart.yaml"; then
-            echo "Chart.yaml was modified in this push"
+          #     # Check if Chart.yaml was modified
+          #     if echo "$CHANGED_FILES" | grep -q "charts/.*/Chart.yaml"; then
+          #       echo "Chart.yaml was modified in this push"
 
-            # Check if the version field specifically was changed
-            VERSION_DIFF=$(git diff HEAD^ HEAD -- charts/*/Chart.yaml | grep "^[+-]version:" || true)
+          #       # Check if the version field specifically was changed
+          #       VERSION_DIFF=$(git diff HEAD^ HEAD -- charts/*/Chart.yaml | grep "^[+-]version:" || true)
 
-            if [ -n "$VERSION_DIFF" ]; then
-              echo "Version was manually modified in Chart.yaml"
-              echo "version_changed=true" >> "$GITHUB_OUTPUT"
-            else
-              echo "Chart.yaml changed but version was not modified"
-              echo "version_changed=false" >> "$GITHUB_OUTPUT"
-            fi
-          else
-            echo "Chart.yaml was not modified, proceeding with auto-bump"
-            echo "version_changed=false" >> "$GITHUB_OUTPUT"
-          fi
+          #       if [ -n "$VERSION_DIFF" ]; then
+          #         echo "Version was manually modified in Chart.yaml"
+          #         echo "version_changed=true" >> "$GITHUB_OUTPUT"
+          #       else
+          #         echo "Chart.yaml changed but version was not modified"
+          #         echo "version_changed=false" >> "$GITHUB_OUTPUT"
+          #       fi
+          #     else
+          #       echo "Chart.yaml was not modified, proceeding with auto-bump"
+          #       echo "version_changed=false" >> "$GITHUB_OUTPUT"
+          #     fi
 
       - name: Bump patch version
-        if: steps.check-version-change.outputs.version_changed == 'false'
+        # if: steps.check-version-change.outputs.version_changed == 'false'
         id: bump
         run: |
           set -euo pipefail
@@ -108,7 +112,7 @@ jobs:
           echo "current_version=$CURRENT_VERSION" >> "$GITHUB_OUTPUT"
 
       - name: Create Pull Request
-        if: steps.check-version-change.outputs.version_changed == 'false'
+        # if: steps.check-version-change.outputs.version_changed == 'false'
         id: cpr
         uses: peter-evans/create-pull-request@v7
         env:
