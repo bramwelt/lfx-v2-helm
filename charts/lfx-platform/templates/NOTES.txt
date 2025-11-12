@@ -3,7 +3,7 @@ Copyright The Linux Foundation and each contributor to LFX.
 SPDX-License-Identifier: MIT
 */ -}}
 
-Thank you for installing {{ .Chart.Name }}.
+Thank you for installing {{ .Chart.Name }}!
 
 Your release is named {{ .Release.Name }}.
 
