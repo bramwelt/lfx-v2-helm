@@ -16,6 +16,9 @@ name: Chart Version Bump
       # the change includes a version bump
       - '!charts/*/Chart.yaml'
 
+concurrency:
+  group: chart-version-bump
+
 permissions:
   contents: write
   pull-requests: write
